@@ -21,30 +21,51 @@ class ExchangeRateAPI:
     def __init__(self, since_date_str: str=None) -> None:
         self.since_date_str = self.__generate_quarterly_date_str__(since_date_str)
 
-    def get_quarter(self, since_date) -> int:
+    def get_quarter(self, since_date: datetime.date) -> int:
+        """
+        Function that finds quarter that the since_date belongs to.
+        
+        :param since_date: a datetime date object
+        :return: an int representing which quarter since_date belongs to
+        """
         return (since_date.month - 1) // 3 + 1
 
-    def get_first_day_of_the_quarter(self, since_date):
+    def get_first_day_of_the_quarter(self, since_date: datetime.date) -> datetime:
+        """
+        Function that finds that first date of a quarter.
+        
+        :param since_date: a datetime date object
+        :return: a datetime date object
+        """
         return datetime(since_date.year, 3 * ((since_date.month - 1) // 3) + 1, 1)
 
-    def get_last_day_of_the_quarter(self, since_date):
+    def get_last_day_of_the_quarter(self, since_date: datetime.date) -> datetime:
+        """
+        Function that finds that last date of the curent quarter from since_data.
+
+        :param since_date: a datetime date object
+        :return: a datetime date object
+        """
         quarter = self.get_quarter(since_date)
         return datetime(since_date.year + 3 * quarter // 12, 3 * quarter % 12 + 1, 1) + timedelta(days=-1)
     
-    def get_last_day_of_previous_quarter(self, since_date):
-        # if since_date.month < 4:
-        #     since_date = datetime.date(since_date.year - 1, 12, 31)
-        # elif since_date.month < 7:
-        #     since_date = datetime.date(since_date.year, 3, 31)
-        # elif since_date.month < 10:
-        #     since_date = datetime.date(since_date.year, 6, 30)
-        # else:
-        #     since_date = datetime.date(since_date.year, 9, 30)
-        # return since_date
+    def get_last_day_of_previous_quarter(self, since_date: datetime.date) -> datetime:
+        """
+        Function that finds that last date of the previous quarter from since_data.
+
+        :param since_date: a datetime date object
+        :return: a datetime date object
+        """
         quarter = self.get_quarter(since_date)
         return datetime(since_date.year, 3 * quarter - 2, 1) + timedelta(days=-1)
     
     def __is_date_in_future__(self, since_date_str: str) -> bool:
+        """
+        Function that checks if date is in the future.
+
+        :param since_date_str: a datetime str, if provided, in ExchangeRateAPI.DATE_STR_FORMAT
+        :return: a bool indicating if the datetime str represents a future date
+        """
         year, month, day = since_date_str.split('-')
         since_date = datetime(int(year), int(month), int(day))
         return since_date > datetime.now()
@@ -58,24 +79,32 @@ class ExchangeRateAPI:
         - If since_date_str is not provided, default to using today's date so the quarter is still ongoing 
         so we will want the get_last_day_of_the_previous_quarter.
 
-        :return: a datatime string in the format of ExchangeRateAPI.DATE_STR_FORMAT
+        :param since_date_str: a datetime str, if provided, in ExchangeRateAPI.DATE_STR_FORMAT
+        :return: a datetime string in the format of ExchangeRateAPI.DATE_STR_FORMAT
         """
-        if self.__is_date_in_future__(since_date_str):
+        if since_date_str and self.__is_date_in_future__(since_date_str):
             raise ValueError(f'Date {since_date_str} provided is in the future, cannot retrieve exchange data.')
 
         if since_date_str:
-            year: str
-            month: str 
-            day: str
             year, month, day = since_date_str.split('-')
-            since_date: datetime = datetime(int(year), int(month), int(day))
-            since_date: str = self.get_last_day_of_the_quarter(since_date.date())
+            since_date = datetime(int(year), int(month), int(day))
+            since_date = self.get_last_day_of_the_quarter(since_date.date())
         else:
-            since_date: datetime = datetime.now()
-            since_date: str = self.get_last_day_of_previous_quarter(since_date)
+            since_date = datetime.now()
+            since_date = self.get_last_day_of_previous_quarter(since_date)
         return since_date.strftime(ExchangeRateAPI.DATE_STR_FORMAT)
     
-    def generate_parquet_quarterly_files(self):
+    def generate_parquet_quarterly_files(self) -> None:
+        """
+        Function that makes an external API call to the US Exchange Data API, filtering on record_date and selecting only
+        the country_currency_desc, exchange_rate, record_date data. If there's multiple pages of data - as the default
+        is each page holds 100 rows of data, it paginating through all the records available.
+
+        The data is grouped by date, as exchange rate data is only generated at the end of each quarter. All data retrieve
+        is stored in parquet files using the quarterly data field record_date value.
+
+        :return: None
+        """
         # Build query URL
         date_str = self.since_date_str
         parameter_str = f'?fields=country_currency_desc,exchange_rate,record_date&filter=record_date:gte:{date_str}'
@@ -149,7 +178,13 @@ if __name__ == '__main__':
         to retrieve US Treasure exchange rate data. This would be python main.py -s='YYYY-MM-DD'."""
     )
 
-    def validate_date_str(date_str):
+    def validate_date_str(date_str: str) -> str:
+        """
+        If user provides a since parameter from the command line, this function validates the date_str provided is
+        a valid date.
+
+        :param date_str: a str representing a date in the format 'YYYY-MM-DD'
+        """
         try:
             is_valid_date = bool(datetime.strptime(date_str, ExchangeRateAPI.DATE_STR_FORMAT))
             return date_str
