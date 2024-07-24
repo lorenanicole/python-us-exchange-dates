@@ -19,34 +19,67 @@ class ExchangeRateAPI:
     
     def __init__(self, since_date_str: str=None) -> None:
         self.since_date_str = self.__generate_quarterly_date_str__(since_date_str)
+        # import pdb; pdb.set_trace()
+
+    def get_quarter(self, p_date) -> int:
+        return (p_date.month - 1) // 3 + 1
+
+
+    def get_first_day_of_the_quarter(self, p_date):
+        return datetime.datetime(p_date.year, 3 * ((p_date.month - 1) // 3) + 1, 1)
+
+
+    def get_last_day_of_the_quarter(self, p_date):
+        quarter = self.get_quarter(p_date)
+        return datetime.datetime(p_date.year + 3 * quarter // 12, 3 * quarter % 12 + 1, 1) + datetime.timedelta(days=-1)
     
     def __generate_quarterly_date_str__(self, since_date_str: str=None) -> str:
-        if since_date_str:
-            year, month, day = since_date_str.split('-')
-            since_date = pd.Timestamp(int(year), int(month), int(day))
-        else:
-            since_date = pd.Timestamp.today()
+        # if since_date_str:
+        #     year, month, day = since_date_str.split('-')
+        #     since_date = pd.Timestamp(int(year), int(month), int(day))
+        # else:
+        #     since_date = pd.Timestamp.today()
 
         # # obtaing the quarter of the given year
         # print("The given date can be found in quarter ", my_date.quarter)
+        
+        # date of previous quarter
+        # if since_date.month < 4:
+        #     since_date = datetime.date(since_date.year - 1, 12, 31)
+        # elif since_date.month < 7:
+        #     since_date = datetime.date(since_date.year, 3, 31)
+        # elif since_date.month < 10:
+        #     since_date = datetime.date(since_date.year, 6, 30)
+        # else:
+        #     since_date = datetime.date(since_date.year, 9, 30)
+        from datetime import datetime,timedelta
 
-        if since_date.month < 4:
-            since_date = datetime.date(since_date.year - 1, 12, 31)
-        elif since_date.month < 7:
-            since_date = datetime.date(since_date.year, 3, 31)
-        elif since_date.month < 10:
-            since_date = datetime.date(since_date.year, 6, 30)
+        if since_date_str:
+            year, month, day = since_date_str.split('-')
+            since_date = datetime(int(year), int(month), int(day))
         else:
-            since_date = datetime.date(since_date.year, 9, 30)
+            since_date = datetime.now()
+            # TODO: If don't yet have current quarter data need to generate last quarter data
 
-        return since_date.strftime("%Y-%m-%d")
+        # from datetime import datetime,timedelta
+
+        # quarter = int((since_date.month - 1) / 3 + 1)
+        # last_day_previous_quarter = datetime(since_date.year, 3 * quarter - 2, 1) + timedelta(days=-1)
+
+        # import pdb; pdb.set_trace()
+
+        new_val = self.get_last_day_of_the_quarter(since_date.date())
+        new_val = new_val.strftime("%Y-%m-%d")
+        # import pdb; pdb.set_trace()
+        return new_val
+
     
     def generate_parquet_quarterly_files(self):
         # Build query URL
         date_str = self.since_date_str
         parameter_str = f'?fields=country_currency_desc,exchange_rate,record_date&filter=record_date:gte:{date_str}'
         endpoint = f'{ExchangeRateAPI.API}/fiscal_service/v1/accounting/od/rates_of_exchange{parameter_str}'
-        
+        # import pdb; pdb.set_trace()
         # Instantiate initial request into responses
         responses, response = [], requests.get(endpoint)
 
