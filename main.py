@@ -17,13 +17,29 @@ class ExchangeRateAPI:
     API = 'https://api.fiscaldata.treasury.gov/services/api/'
     PROJECT_ROOT = Path(__file__).parent.absolute()
     
-    def __init__(self, since_date_str):
-        self.since_date_str = self.__generate_quarterly_date(since_date_str)
+    def __init__(self, since_date_str: str=None) -> None:
+        self.since_date_str = self.__generate_quarterly_date_str__(since_date_str)
     
-    def __generate_quarterly_date__(self, since_date_str):
-        import pdb; pdb.set_trace()
-        quarter_start = pd.to_datetime(pd.datetime.today() - pd.tseries.offsets.QuarterBegin(startingMonth=1)).date()
-        return quarter_start
+    def __generate_quarterly_date_str__(self, since_date_str: str=None) -> str:
+        if since_date_str:
+            year, month, day = since_date_str.split('-')
+            since_date = pd.Timestamp(int(year), int(month), int(day))
+        else:
+            since_date = pd.Timestamp.today()
+
+        # # obtaing the quarter of the given year
+        # print("The given date can be found in quarter ", my_date.quarter)
+
+        if since_date.month < 4:
+            since_date = datetime.date(since_date.year - 1, 12, 31)
+        elif since_date.month < 7:
+            since_date = datetime.date(since_date.year, 3, 31)
+        elif since_date.month < 10:
+            since_date = datetime.date(since_date.year, 6, 30)
+        else:
+            since_date = datetime.date(since_date.year, 9, 30)
+
+        return since_date.strftime("%Y-%m-%d")
     
     def generate_parquet_quarterly_files(self):
         # Build query URL
@@ -116,8 +132,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Use API interface below to generate parquet quarterly files
-    date_str = args.since if args.since else datetime.today().strftime('%Y-%m-%d')
-    api = ExchangeRateAPI(date_str)
+    api = ExchangeRateAPI(args.since)
     api.generate_parquet_quarterly_files()
 
     # Can uncomment below to confirm can read back parquet files if need!
